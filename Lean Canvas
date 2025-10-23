@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lean Canvas - Asesor Interactivo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(to bottom right, #0f172a, #581c87, #0f172a);
+            min-height: 100vh;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .line-clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="text-white p-4">
+    <div class="max-w-7xl mx-auto">
+        <div class="glass rounded-2xl p-6 mb-6">
+            <h1 class="text-3xl font-bold mb-2">🚀 Lean Canvas - Asesor Interactivo</h1>
+            <p class="text-purple-200">Construye tu modelo de negocio de forma estructurada y basada en datos</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-1">
+                <div class="glass rounded-2xl p-4 sticky top-4">
+                    <h2 class="text-xl font-bold mb-4">💬 Bloques del Canvas</h2>
+                    <div id="blocksList" class="space-y-2"></div>
+                    <div class="mt-6 space-y-2">
+                        <button onclick="toggleCanvas()" class="w-full bg-blue-600 hover:bg-blue-700 p-3 rounded-lg transition-all">
+                            👁️ <span id="canvasToggleText">Ver Canvas Completo</span>
+                        </button>
+                        <button onclick="exportJSON()" class="w-full bg-green-600 hover:bg-green-700 p-3 rounded-lg transition-all">
+                            📥 Exportar JSON Completo
+                        </button>
+                        <button onclick="resetCanvas()" class="w-full bg-red-600 hover:bg-red-700 p-3 rounded-lg transition-all">
+                            🔄 Resetear Canvas
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-2 space-y-6">
+                <div class="glass rounded-2xl p-6" id="currentBlockContainer">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-2xl font-bold flex items-center gap-2">
+                            <span class="text-3xl" id="currentBlockIcon"></span>
+                            <span id="currentBlockName"></span>
+                        </h2>
+                        <div class="flex gap-2">
+                            <button onclick="prevBlock()" id="prevBtn" class="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-all">◀️</button>
+                            <button onclick="nextBlock()" id="nextBtn" class="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-all">▶️</button>
+                        </div>
+                    </div>
+                    <div class="mb-6 p-4 bg-purple-500/20 rounded-lg border border-purple-400/30">
+                        <p class="text-sm italic" id="currentBlockPrompt"></p>
+                    </div>
+                    <div class="space-y-4">
+                        <textarea id="userInput" placeholder="Describe tu contexto aquí (2-5 frases)..." class="w-full h-32 bg-white/5 border border-white/20 rounded-lg p-4 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"></textarea>
+                        <div class="flex gap-2">
+                            <button onclick="analyzeInput()" class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 p-3 rounded-lg font-semibold transition-all">Analizar</button>
+                            <button onclick="exportBlockJSON()" id="exportBlockBtn" class="bg-green-600 hover:bg-green-700 p-3 rounded-lg transition-all hidden">📄 Exportar Bloque</button>
+                        </div>
+                    </div>
+                    <div id="analysisResults" class="mt-6 space-y-4 hidden"></div>
+                </div>
+                <div id="canvasOverview" class="glass rounded-2xl p-6 hidden">
+                    <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">👁️ Canvas Actual - Resumen</h2>
+                    <div id="canvasGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-6 text-center text-sm text-gray-400">
+            <p>Lean Canvas - Metodología estructurada para validar modelos de negocio</p>
+            <p class="mt-1">Los datos se guardan automáticamente en tu navegador</p>
+        </div>
+    </div>
+
+    <script>
+        const blocks = [
+            { id: 'problema', name: 'Problema', icon: '⚠️', prompt: 'Describe 3 dolores concretos, con qué frecuencia aparecen y qué pasa si no se resuelven.' },
+            { id: 'segmentos', name: 'Segmentos de Clientes', icon: '👥', prompt: '¿Quién compra hoy? 1–3 tipos con motivaciones y objeciones.' },
+            { id: 'pvu', name: 'Propuesta de Valor Única', icon: '💎', prompt: 'En 1–2 frases: ¿qué te hace distinto y por qué vale la pena?' },
+            { id: 'solucion', name: 'Solución', icon: '🔧', prompt: '3 funciones mínimas (MVP) que resuelvan el dolor principal.' },
+            { id: 'canales', name: 'Canales', icon: '📢', prompt: 'Descubrimiento → Consideración → Conversión (orgánico, paid, partners).' },
+            { id: 'ingresos', name: 'Fuentes de Ingreso', icon: '💰', prompt: 'Modelo (venta única/suscripción/comisión), precio inicial y por qué.' },
+            { id: 'costos', name: 'Estructura de Costos', icon: '💳', prompt: 'Fijos, variables y 2–3 más sensibles.' },
+            { id: 'metricas', name: 'Métricas Clave', icon: '📊', prompt: 'Elige 5–7 accionables: CVR, CPA, CAC, LTV, ROAS, ARPU, retención…' },
+            { id: 'ventaja', name: 'Ventaja Injusta', icon: '🛡️', prompt: '¿Qué no pueden copiar fácil? (comunidad, datos, procesos, marca, exclusividades).' }
+        ];
+        let currentBlock = 0;
+        let canvasData = {};
+        let showCanvasView = false;
+
+        const analyses = {
+            problema: {
+                assumptions: ['Los usuarios experimentan estos problemas con frecuencia suficiente','El problema genera suficiente frustración como para motivar una compra','No existen alternativas satisfactorias en el mercado actual'],
+                suggestions: [{idea:'Cuantifica la frecuencia',why:'Datos concretos validan la urgencia',example:'60% de usuarios experimenta esto semanalmente'},{idea:'Prioriza por impacto vs frecuencia',why:'Enfócate en el dolor más crítico para el MVP'},{idea:'Documenta el costo de no resolver',why:'Justifica tu precio y urgencia'}],
+                risks: ['El problema puede no ser lo suficientemente doloroso para pagar','Usuarios pueden tener workarounds aceptables','El problema puede ser síntoma de algo más profundo'],
+                experiments: [{name:'Entrevistas de problema',metric:'Validación de dolor',design:'15-20 entrevistas de 15 min con segmento objetivo',success_if:'70%+ confirma el problema como crítico',duration_days:10},{name:'Landing page de validación',metric:'Email sign-ups',design:'Página describiendo el problema sin mencionar solución',success_if:'100+ emails en 7 días',duration_days:7}],
+                kpis: ['% usuarios que confirman el problema','Frecuencia promedio del dolor','Costo estimado del problema no resuelto','Tasa de interés en soluciones']
+            },
+            segmentos: {
+                assumptions: ['Los segmentos identificados tienen poder adquisitivo','Son accesibles a través de canales conocidos','Comparten características similares para escalar marketing'],
+                suggestions: [{idea:'Crea buyer personas detallados',why:'Facilita decisiones de producto y marketing',example:'María, 35, dueña de café, $50k/mes'},{idea:'Identifica el early adopter',why:'Este segmento te dará tracción inicial'},{idea:'Mapea objeciones por segmento',why:'Prepara respuestas y mejora conversión'}],
+                risks: ['Segmentos demasiado amplios diluyen el mensaje','Early adopters pueden no representar el mercado total','Diferentes segmentos pueden requerir soluciones distintas'],
+                experiments: [{name:'Anuncios segmentados',metric:'CTR por segmento',design:'Crear 3 variantes de anuncio, uno por segmento ($50 cada uno)',success_if:'Un segmento tiene CTR 2x superior',duration_days:7}],
+                kpis: ['CAC por segmento','Tasa de conversión por segmento','LTV por segmento','Tiempo de ciclo de venta']
+            },
+            pvu: {
+                assumptions: ['La diferenciación es clara y perceptible','El valor único justifica precio premium','Es defendible 6-12 meses antes de ser copiado'],
+                suggestions: [{idea:'Usa fórmula: Para [segmento] que [necesidad], [producto] es [categoría] que [beneficio]',why:'Claridad inmediata'},{idea:'Enfócate en beneficio, no feature',why:'Conecta emocionalmente',example:'No "analytics avanzado" sino "decisiones en 5 min, no 5 horas"'}],
+                risks: ['Propuesta no es percibida como única','Competidores pueden copiar rápidamente','El valor único no es valorado por suficientes clientes'],
+                experiments: [{name:'Headline test',metric:'Bounce rate',design:'3 versiones de landing con diferentes PVU',success_if:'Versión ganadora reduce bounce 20%+',duration_days:7}],
+                kpis: ['% visitantes que entienden PVU','Tiempo en página de PVU','Tasa de signup','Net Promoter Score']
+            },
+            solucion: {
+                assumptions: ['Las 3 funciones core resuelven el problema principal','Son técnicamente viables en el timeframe del MVP','Usuarios pagan por MVP con features limitadas'],
+                suggestions: [{idea:'Prioriza con matriz Impacto/Esfuerzo',why:'Maximiza valor del MVP con recursos limitados'},{idea:'Define "done" para cada feature',why:'Evita scope creep'},{idea:'Considera no-code/low-code',why:'Velocidad de validación'}],
+                risks: ['MVP con tan pocas features que no resuelve el problema','Tiempo de desarrollo subestimado','Dependencias técnicas inesperadas'],
+                experiments: [{name:'Concierge MVP',metric:'Satisfacción',design:'Ofrecer servicio manual a 10 clientes simulando el software',success_if:'8/10 clientes satisfechos',duration_days:14}],
+                kpis: ['Feature adoption rate','Time to value','Task completion rate','Feature request frequency']
+            },
+            canales: {
+                assumptions: ['Canales elegidos son donde tu segmento pasa tiempo','Tienes capacidad de ejecutar','CAC permite unit economics viables'],
+                suggestions: [{idea:'Mapea el customer journey completo',why:'Identifica puntos de abandono'},{idea:'Empieza con 1-2 canales, domínalos',why:'Mejor ser excelente en uno que mediocre en cinco'},{idea:'Calcula CAC por canal desde día 1',why:'Dobla apuesta en lo que funciona'}],
+                risks: ['Canales saturados suben CAC','Dependencia de un solo canal es riesgosa','Tiempo hasta tracción más largo de lo esperado'],
+                experiments: [{name:'Channel test',metric:'CAC por canal',design:'$200 en cada uno de 3 canales. Mismo mensaje',success_if:'Un canal con CAC <$50',duration_days:10}],
+                kpis: ['CAC por canal','LTV:CAC ratio','Conversion rate por etapa','Calidad de lead por canal']
+            },
+            ingresos: {
+                assumptions: ['Precio está en rango aceptable','Modelo se alinea con cómo clientes prefieren pagar','Márgenes permiten viabilidad'],
+                suggestions: [{idea:'Ofrece 2-3 tiers de precio',why:'Captura diferentes disposiciones a pagar'},{idea:'Considera freemium con límites claros',why:'Adquisición low-cost'},{idea:'Factura anual con descuento',why:'Mejora cash flow y reduce churn'}],
+                risks: ['Precio muy bajo dificulta profitabilidad','Precio muy alto limita adopción','Cambios de precio pueden generar churn'],
+                experiments: [{name:'Price sensitivity test',metric:'Conversion rate',design:'3 landings idénticas, diferentes precios',success_if:'Identificar precio óptimo',duration_days:10}],
+                kpis: ['MRR/ARR','ARPU','Revenue per customer','Upgrade rate','Payment success rate']
+            },
+            costos: {
+                assumptions: ['Has identificado los costos principales','Costos variables escalan predeciblemente','Existen oportunidades de optimización'],
+                suggestions: [{idea:'Separa: desarrollo, marketing, operación, admin',why:'Claridad en dónde se va el dinero'},{idea:'Identifica costos variables por unidad',why:'Entiende márgenes reales'},{idea:'Usa herramientas gratuitas inicialmente',why:'Preserve runway'}],
+                risks: ['Costos ocultos pueden aparecer','Crecimiento aumenta costos más rápido que ingresos','Dependencia de proveedores caros'],
+                experiments: [{name:'Cost audit',metric:'Reducción de costos',design:'Revisar cada gasto. Identificar alternativas',success_if:'Reducción de 15%+',duration_days:7}],
+                kpis: ['Burn rate mensual','Runway (meses)','Costo variable por unidad','Margen bruto','Costos como % de revenue']
+            },
+            metricas: {
+                assumptions: ['Las métricas son accionables','Son medibles con recursos actuales','Se correlacionan con salud del negocio'],
+                suggestions: [{idea:'Usa framework AARRR',why:'Cobertura completa del funnel'},{idea:'Define una North Star Metric',why:'Alinea todo el equipo'},{idea:'Establece leading indicators',why:'Predicen problemas antes que impacten revenue'}],
+                risks: ['Métricas de vanidad sin correlación','Demasiadas métricas generan parálisis','Métricas mal implementadas dan datos incorrectos'],
+                experiments: [{name:'Metric instrumentation',metric:'Data completeness',design:'Implementar tracking para métricas clave',success_if:'95%+ eventos capturados',duration_days:5}],
+                kpis: ['North Star Metric','CAC','LTV','LTV:CAC ratio','Monthly Active Users','Retention rate','Churn rate']
+            },
+            ventaja: {
+                assumptions: ['La ventaja es difícil de replicar','Es suficientemente fuerte para defender market share','Se puede fortalecer con el tiempo'],
+                suggestions: [{idea:'Evalúa: Network effects, tech, brand, procesos',why:'Frameworks probados de moats'},{idea:'Construye assets difíciles de replicar',why:'Contenido SEO, comunidad, dataset'},{idea:'Documenta tu ventaja y roadmap',why:'Importante para fundraising'}],
+                risks: ['Sobrestimar la dificultad de replicación','Ventaja basada en factores que pueden cambiar','Competidores con más recursos copian más rápido'],
+                experiments: [{name:'Competitive analysis',metric:'Uniqueness score',design:'Listar 5 competidores. Calificar dificultad de replicar',success_if:'Promedio >7/10',duration_days:10}],
+                kpis: ['Retención vs competencia','Brand awareness','NPS vs competidores','Switching cost','Tamaño de comunidad']
+            }
+        };
+
+        function loadData() {
+            const saved = localStorage.getItem('lean-canvas-data');
+            if (saved) canvasData = JSON.parse(saved);
+        }
+
+        function saveData() {
+            localStorage.setItem('lean-canvas-data', JSON.stringify(canvasData));
+        }
+
+        function generateAnalysis(blockId) {
+            return analyses[blockId] || {assumptions:['En desarrollo'],suggestions:[{idea:'Proporciona contexto',why:'Para análisis preciso'}],risks:['Info insuficiente'],experiments:[{name:'Validación',metric:'Feedback',design:'Describe situación',success_if:'Claridad',duration_days:7}],kpis:['Por definir']};
+        }
+
+        function init() {
+            loadData();
+            renderBlocksList();
+            updateCurrentBlock();
+        }
+
+        function renderBlocksList() {
+            document.getElementById('blocksList').innerHTML = blocks.map((block, index) => `
+                <button onclick="setCurrentBlock(${index})" class="w-full text-left p-3 rounded-lg transition-all ${currentBlock === index ? 'bg-purple-600 shadow-lg scale-105' : 'bg-white/5 hover:bg-white/10'} ${canvasData[block.id] ? 'border-l-4 border-green-400' : ''}">
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl">${block.icon}</span>
+                        <div class="flex-1">
+                            <div class="font-semibold text-sm">${index + 1}. ${block.name}</div>
+                            ${canvasData[block.id] ? '<div class="text-xs text-green-300">✓ Completado</div>' : ''}
+                        </div>
+                    </div>
+                </button>
+            `).join('');
+        }
+
+        function updateCurrentBlock() {
+            const block = blocks[currentBlock];
+            document.getElementById('currentBlockIcon').textContent = block.icon;
+            document.getElementById('currentBlockName').textContent = block.name;
+            document.getElementById('currentBlockPrompt').textContent = block.prompt;
+            document.getElementById('prevBtn').disabled = currentBlock === 0;
+            document.getElementById('nextBtn').disabled = currentBlock === blocks.length - 1;
+            const exportBtn = document.getElementById('exportBlockBtn');
+            if (canvasData[block.id]) {
+                exportBtn.classList.remove('hidden');
+                document.getElementById('userInput').value = canvasData[block.id].userInput;
+                renderAnalysis(block.id);
+            } else {
+                exportBtn.classList.add('hidden');
+                document.getElementById('userInput').value = '';
+                document.getElementById('analysisResults').classList.add('hidden');
+            }
+            renderBlocksList();
+        }
+
+        function setCurrentBlock(index) {
+            currentBlock = index;
+            updateCurrentBlock();
+        }
+
+        function prevBlock() {
+            if (currentBlock > 0) {
+                currentBlock--;
+                updateCurrentBlock();
+            }
+        }
+
+        function nextBlock() {
+            if (currentBlock < blocks.length - 1) {
+                currentBlock++;
+                updateCurrentBlock();
+            }
+        }
+
+        function analyzeInput() {
+            const input = document.getElementById('userInput').value.trim();
+            if (!input) {
+                alert('Por favor ingresa tu contexto antes de analizar');
+                return;
+            }
+            const block = blocks[currentBlock];
+            const analysis = generateAnalysis(block.id);
+            canvasData[block.id] = {userInput: input, analysis: analysis, timestamp: new Date().toISOString()};
+            saveData();
+            renderAnalysis(block.id);
+            renderBlocksList();
+        }
+
+        function renderAnalysis(blockId) {
+            const data = canvasData[blockId];
+            if (!data) return;
+            const container = document.getElementById('analysisResults');
+            container.classList.remove('hidden');
+            container.innerHTML = `
+                <div class="bg-blue-500/20 border border-blue-400/30 rounded-lg p-4">
+                    <h3 class="font-bold mb-3">💡 Hipótesis (${data.analysis.assumptions.length})</h3>
+                    <ul class="space-y-2 text-sm">${data.analysis.assumptions.map(item => `<li class="flex gap-2"><span class="text-blue-300">•</span><span>${item}</span></li>`).join('')}</ul>
+                </div>
+                <div class="bg-green-500/20 border border-green-400/30 rounded-lg p-4">
+                    <h3 class="font-bold mb-3">💡 Sugerencias Accionables</h3>
+                    <div class="space-y-3">${data.analysis.suggestions.map(item => `
+                        <div class="bg-white/5 rounded p-3">
+                            <div class="font-semibold text-green-300">${item.idea}</div>
+                            <div class="text-sm text-gray-300 mt-1">${item.why}</div>
+                            ${item.example ? `<div class="text-xs text-gray-400 mt-1 italic">Ejemplo: ${item.example}</div>` : ''}
+                        </div>
+                    `).join('')}</div>
+                </div>
+                <div class="bg-red-500/20 border border-red-400/30 rounded-lg p-4">
+                    <h3 class="font-bold mb-3">⚠️ Riesgos</h3>
+                    <ul class="space-y-2 text-sm">${data.analysis.risks.map(item => `<li class="flex gap-2"><span class="text-red-300">⚠</span><span>${item}</span></li>`).join('')}</ul>
+                </div>
+                <div class="bg-purple-500/20 border border-purple-400/30 rounded-lg p-4">
+                    <h3 class="font-bold mb-3">🧪 Experimentos (≤14 días)</h3>
+                    <div class="space-y-3">${data.analysis.experiments.map(exp => `
+                        <div class="bg-white/5 rounded p-3">
+                            <div class="font-semibold text-purple-300">${exp.name}</div>
+                            <div class="text-sm mt-2 space-y-1">
+                                <div><span class="text-gray-400">Métrica:</span> ${exp.metric}</div>
+                                <div><span class="text-gray-400">Diseño:</span> ${exp.design}</div>
+                                <div><span class="text-gray-400">Éxito si:</span> ${exp.success_if}</div>
+                                <div><span class="text-gray-400">Duración:</span> ${exp.duration_days} días</div>
+                            </div>
+                        </div>
+                    `).join('')}</div>
+                </div>
+                <div class="bg-yellow-500/20 border border-yellow-400/30 rounded-lg p-4">
+                    <h3 class="font-bold mb-3">📊 KPIs Clave</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">${data.analysis.kpis.map(kpi => `<div class="bg-white/5 rounded p-2 flex items-center gap-2"><span class="text-yellow-300">📊</span><span>${kpi}</span></div>`).join('')}</div>
+                </div>
+                <div class="flex justify-between items-center p-4 bg-white/5 rounded-lg">
+                    <p class="text-sm">¿Pasamos al siguiente bloque?</p>
+                    <button onclick="nextBlock()" ${currentBlock === blocks.length - 1 ? 'disabled' : ''} class="bg-purple-600 hover:bg-purple-700 px-6 py-2 rounded-lg font-semibold disabled:opacity-50 transition-all">Sí, siguiente</button>
+                </div>
+            `;
+        }
+
+        function toggleCanvas() {
+            showCanvasView = !showCanvasView;
+            const overview = document.getElementById('canvasOverview');
+            const toggleText = document.getElementById('canvasToggleText');
+            if (showCanvasView) {
+                overview.classList.remove('hidden');
+                toggleText.textContent = 'Ocultar Canvas';
+                renderCanvasOverview();
+            } else {
+                overview.classList.add('hidden');
+                toggleText.textContent = 'Ver Canvas Completo';
+            }
+        }
+
+        function renderCanvasOverview() {
+            document.getElementById('canvasGrid').innerHTML = blocks.map(block => {
+                const hasData = canvasData[block.id];
+                return `
+                    <div class="${hasData ? 'bg-green-500/20 border border-green-400/30' : 'bg-white/5 border border-white/10'} p-4 rounded-lg">
+                        <h3 class="font-bold flex items-center gap-2 mb-2"><span class="text-xl">${block.icon}</span>${block.name}</h3>
+                        ${hasData ? `<div class="text-sm"><p class="text-gray-300 line-clamp-3">${canvasData[block.id].userInput}</p><button onclick="goToBlock('${block.id}')" class="mt-2 text-purple-300 hover:text-purple-200 text-xs underline">Ver detalles →</button></div>` : '<p class="text-gray-500 text-sm">Sin completar</p>'}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function goToBlock(blockId) {
+            const index = blocks.findIndex(b => b.id === blockId);
+            if (index !== -1) {
+                currentBlock = index;
+                showCanvasView = false;
+                document.getElementById('canvasOverview').classList.add('hidden');
+                document.getElementById('canvasToggleText').textContent = 'Ver Canvas Completo';
+                updateCurrentBlock();
+            }
+        }
+
+        function exportJSON(blockId = null) {
+            let dataToExport, filename;
+            if (blockId) {
+                const blockData = canvasData[blockId];
+                if (!blockData) {
+                    alert('No hay datos para este bloque');
+                    return;
+                }
+                dataToExport = {block: blockId, ...blockData.analysis};
+                filename = `lean-canvas-${blockId}.json`;
+            } else {
+                if (Object.keys(canvasData).length === 0) {
+                    alert('No hay datos para exportar. Completa al menos un bloque.');
+                    return;
+                }
+                dataToExport = Object.keys(canvasData).reduce((acc, key) => {
+                    acc[key] = {userInput: canvasData[key].userInput, ...canvasData[key].analysis};
+                    return acc;
+                }, {});
+                filename = 'lean-canvas-completo.json';
+            }
+            const blob = new Blob([JSON.stringify(dataToExport, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function exportBlockJSON() {
+            exportJSON(blocks[currentBlock].id);
+        }
+
+        function resetCanvas() {
+            if (confirm('¿Estás seguro? Esto borrará todo el progreso.')) {
+                localStorage.removeItem('lean-canvas-data');
+                canvasData = {};
+                currentBlock = 0;
+                showCanvasView = false;
+                document.getElementById('canvasOverview').classList.add('hidden');
+                document.getElementById('canvasToggleText').textContent = 'Ver Canvas Completo';
+                updateCurrentBlock();
+            }
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
